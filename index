@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:clip; background:#003300; }
+iframe { width:100%; height:100%; border:none; display:block; }
+</style>
+</head>
+<body>
+<iframe
+  src="https://mmmichaelllang.github.io/relatio-widget/animation.html"
+  scrolling="no"
+  sandbox="allow-scripts allow-same-origin">
+</iframe>
+<script>
+window.addEventListener('message', function(e) {
+  if (!e.data) return;
+  if (e.data.type === 'iframeScrollInit') {
+    e.source.postMessage({ type: 'iframeScrollAck', y: window.scrollY }, '*');
+  }
+  if (e.data.type === 'iframeScrollTo') {
+    window.scrollTo({ top: e.data.y, behavior: 'instant' });
+  }
+});
+</script>
+</body>
+</html>
