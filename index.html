@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pedagogical Architecture — Inverted Root System</title>
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Space+Mono:wght@400;700&display=swap');
+
+    :root {
+        --accent:     #c8ff00;
+        --accent-dim: rgba(200,255,0,0.22);
+        --font-sans:  'Space Mono', monospace;
+        --font-serif: 'Playfair Display', serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body, html {
+        background-color: #003300;
+        font-family: var(--font-sans);
+        color: #fff;
+        width: 100%;
+        /* ↓ FIX: removed overflow:hidden + min-height:100vh — both break iframe embeds */
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        padding: 0.75rem 0.5rem 1.5rem;
+    }
+
+    body::before {
+        content: '';
+        position: fixed; inset: 0;
+        background:
+            radial-gradient(ellipse 75% 60% at 50% 50%, rgba(0, 80, 0, 0.42), transparent 70%),
+            radial-gradient(ellipse 50% 40% at 30% 70%, rgba(0, 45, 10, 0.22), transparent),
+            radial-gradient(ellipse 55% 45% at 75% 35%, rgba(20, 60, 0, 0.18), transparent);
+        animation: auroraShift 10s ease-in-out infinite alternate;
+        pointer-events: none;
+        z-index: 0; /* ↓ FIX: explicit z-index keeps aurora behind content */
+    }
+    @keyframes auroraShift {
+        from { opacity: 0.6; transform: scale(1); }
+        to   { opacity: 1;   transform: scale(1.04); }
+    }
+
+    .glass-card {
+        position: relative; z-index: 1;
+        background: transparent;
+        padding: 0.5rem;
+        display: flex; flex-direction: column; align-items: center;
+        width: 100%; max-width: 620px;
+        gap: 0.75rem;
+    }
+
+    .svg-container {
+        width: 100%; height: auto;
+    }
+
+    /* ── TRACK STYLES ── */
+    .track-base {
+        fill: none;
+        stroke: rgba(200,255,0,0.10);
+        stroke-width: 2.5;
+        stroke-linecap: round;
+    }
+    .track-flow {
+        fill: none; stroke: var(--accent);
+        stroke-width: 1.5; stroke-linecap: round;
+        stroke-dasharray: 5 24;              /* period = 29 */
+        animation: dashFlow 2s linear infinite;
+        opacity: 0.85;
+    }
+    .track-flow-slow {
+        fill: none; stroke: rgba(200,255,0,0.28);
+        stroke-width: 2.5; stroke-linecap: round;
+        stroke-dasharray: 2 44;              /* period = 46 */
+        animation: dashFlowSlow 5s linear infinite;
+    }
+    .track-return {
+        fill: none;
+        stroke: rgba(200,255,0,0.22);
+        stroke-width: 1.2; stroke-linecap: round;
+        stroke-dasharray: 3 9;               /* period = 12 */
+        animation: dashReturn 3.5s linear infinite;
+    }
+
+    /*
+     * FIX: Each @keyframes offset now equals its path's dasharray period.
+     * Previously all paths used dashFlow's -29 offset, causing non-seamless
+     * loops on slow and return tracks.
+     */
+    @keyframes dashFlow     { to { stroke-dashoffset: -29; } }  /* 5+24=29  ✓ */
+    @keyframes dashFlowSlow { to { stroke-dashoffset: -46; } }  /* 2+44=46  ✓ */
+    @keyframes dashReturn   { to { stroke-dashoffset: -12; } }  /* 3+9=12   ✓ */
+    @keyframes dashNeonRet  { to { stroke-dashoffset: -14; } }  /* 2+12=14  ✓ */
+
+    /*
+     * FIX: node-core-dot breathing now uses transform:scale() instead of
+     * animating the SVG `r` attribute. CSS `r` animation is Chrome-only;
+     * Firefox ignores it entirely.
+     */
+    .node-core-dot {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: coreBreath 3.2s ease-in-out infinite;
+    }
+    @keyframes coreBreath {
+        0%, 100% { transform: scale(1);    }
+        50%      { transform: scale(1.45); }  /* 5.5 → ~8 */
+    }
+
+    /*
+     * FIX: pulse rings also use transform:scale() for cross-browser support.
+     * Scale factor: target r34 / base r12 = 2.83
+     * Stroke naturally thins as the ring expands and fades — no separate
+     * stroke-width keyframe needed.
+     */
+    .pulse-ring-a,
+    .pulse-ring-b {
+        fill: none;
+        transform-box: fill-box;
+        transform-origin: center;
+    }
+    .pulse-ring-a { animation: pulseRing 3s ease-out infinite; }
+    .pulse-ring-b { animation: pulseRing 3s ease-out infinite -1.5s; }
+    @keyframes pulseRing {
+        0%   { transform: scale(1);    opacity: 0.65; }
+        100% { transform: scale(2.83); opacity: 0;    }
+    }
+
+    /* ── SVG LABELS ── */
+    .lbl-title {
+        font-family: var(--font-serif);
+        font-weight: 700;
+        font-size: 17px;
+        fill: #ffffff;
+        letter-spacing: 0.035em;
+        filter: url(#textHalo);
+    }
+    .lbl-sub {
+        font-family: var(--font-sans);
+        font-size: 9.5px;
+        fill: #7ac47a;
+        letter-spacing: 0.15em;
+        filter: url(#textHalo);
+    }
+
+    /* ── CAPTION ── */
+    .caption-box {
+        position: relative; z-index: 1;
+        border-top: 1px dashed rgba(200,255,0,0.20);
+        padding-top: 0.9rem;
+        text-align: center;
+        width: 100%;
+    }
+    .caption-text {
+        font-family: var(--font-sans);
+        font-size: 13.5px;
+        color: rgba(220,255,220,0.75);
+        line-height: 1.85;
+        letter-spacing: 0.02em;
+        max-width: 520px;
+        margin: 0 auto;
+    }
+
+    /* ── HIGHLIGHTERS ── */
+    strong.hl-v1, strong.hl-v2, strong.hl-v3 {
+        font-family: var(--font-serif);
+        font-weight: 700;
+        color: #000;
+        background-size: 100% 108%;
+        background-position: center;
+        background-repeat: no-repeat;
+        padding: 0 0.18rem;
+        -webkit-box-decoration-break: clone;
+        box-decoration-break: clone;
+        text-shadow: 1px 1px 0.5px rgba(255,255,255,0.35);
+        transition: background-size 0.3s ease;
+    }
+    strong.hl-v1 {
+        background-image: linear-gradient(104deg,
+            rgba(255,221,0,0) .05%,   rgba(255,221,0,.85) 2.4%,
+            rgba(255,221,0,.60) 5.8%, rgba(255,221,0,.80) 93%,
+            rgba(255,221,0,0) 99.95%);
+        border-radius: 3px 8px 10px 4px;
+    }
+    strong.hl-v2 {
+        background-image: linear-gradient(104deg,
+            rgba(255,221,0,0) .01%,  rgba(255,221,0,.90) 2.4%,
+            rgba(255,221,0,.70) 12%, rgba(255,221,0,.85) 88%,
+            rgba(255,221,0,0) 99.99%);
+        border-radius: 5px 2px 8px 6px;
+    }
+    strong.hl-v3 {
+        background-image: linear-gradient(104deg,
+            rgba(255,221,0,0) .08%,   rgba(255,221,0,.70) 2.4%,
+            rgba(255,221,0,.40) 5.8%, rgba(255,221,0,.70) 93%,
+            rgba(255,221,0,0) 99.92%);
+        border-radius: 2px 9px 5px 3px;
+    }
+    strong.hl-v1:hover,
+    strong.hl-v2:hover,
+    strong.hl-v3:hover { background-size: 100% 122%; }
+</style>
+</head>
+<body>
+
+<div class="glass-card">
+
+    <svg class="svg-container"
+         viewBox="50 35 510 530"
+         xmlns="http://www.w3.org/2000/svg"
+         role="img"
+         aria-label="Pedagogical architecture diagram showing four interconnected nodes: Relational Prerequisite at top, Classroom Ecology in the center, branching down to Constructivism (left) and Literature as Soulcraft (right), with animated feedback loops returning upward.">
+
+        <!-- Accessible SVG title for screen readers -->
+        <title>Pedagogical Architecture — Inverted Root System</title>
+
+        <defs>
+            <!-- ── FILTERS ── -->
+            <filter id="neonGlow" x="-80%" y="-80%" width="260%" height="260%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="b1"/>
+                <feGaussianBlur in="SourceGraphic" stdDeviation="7"   result="b2"/>
+                <feColorMatrix in="b2" type="matrix"
+                    values="0.6 0.9 0  0 0
+                            0.2 1   0  0 0
+                            0   0.3 0  0 0
+                            0   0   0  1.4 0" result="cb"/>
+                <feMerge>
+                    <feMergeNode in="cb"/>
+                    <feMergeNode in="b1"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+
+            <filter id="tubeGlow" x="-40%" y="-400%" width="180%" height="900%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="5"/>
+            </filter>
+
+            <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="5"/>
+            </filter>
+
+            <!-- Organic text halo: dilate → blur → dark green fill → composite -->
+            <filter id="textHalo" x="-18%" y="-55%" width="136%" height="210%">
+                <feMorphology operator="dilate" radius="5" in="SourceAlpha" result="expanded"/>
+                <feGaussianBlur in="expanded" stdDeviation="4" result="blurred"/>
+                <feFlood flood-color="#001a00" flood-opacity="0.92" result="col"/>
+                <feComposite in="col" in2="blurred" operator="in" result="halo"/>
+                <feMerge>
+                    <feMergeNode in="halo"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+
+            <!-- ── GRADIENTS ── -->
+            <radialGradient id="nodeFill" cx="40%" cy="35%" r="60%">
+                <stop offset="0%"   stop-color="#ffffff"/>
+                <stop offset="45%"  stop-color="#c8ff00"/>
+                <stop offset="100%" stop-color="#406000"/>
+            </radialGradient>
+            <radialGradient id="glowPool" cx="50%" cy="50%" r="50%">
+                <stop offset="0%"   stop-color="rgba(200,255,0,0.22)"/>
+                <stop offset="100%" stop-color="rgba(200,255,0,0)"/>
+            </radialGradient>
+            <radialGradient id="glowPoolSm" cx="50%" cy="50%" r="50%">
+                <stop offset="0%"   stop-color="rgba(200,255,0,0.15)"/>
+                <stop offset="100%" stop-color="rgba(200,255,0,0)"/>
+            </radialGradient>
+
+            <!-- ── MOTION PATHS ── -->
+            <path id="mPath-trunk"     d="M 300 138 L 300 282"/>
+            <path id="mPath-left"      d="M 300 212 L 150 212 L 150 442"/>
+            <path id="mPath-right"     d="M 300 212 L 450 212 L 450 442"/>
+            <!-- Return paths defined leaf→center so default direction = upward -->
+            <path id="mPath-ret-left"  d="M 150 442 C 155 370 230 295 300 282"/>
+            <path id="mPath-ret-right" d="M 450 442 C 445 370 370 295 300 282"/>
+        </defs>
+
+        <!-- ═══ AMBIENT GLOW POOLS ═══ -->
+        <ellipse cx="300" cy="142" rx="58" ry="14" fill="url(#glowPool)"   opacity="0.7"  filter="url(#softGlow)"/>
+        <ellipse cx="300" cy="286" rx="55" ry="13" fill="url(#glowPool)"   opacity="0.55" filter="url(#softGlow)"/>
+        <ellipse cx="150" cy="446" rx="46" ry="11" fill="url(#glowPoolSm)" opacity="0.5"  filter="url(#softGlow)"/>
+        <ellipse cx="450" cy="446" rx="46" ry="11" fill="url(#glowPoolSm)" opacity="0.5"  filter="url(#softGlow)"/>
+
+        <!-- ═══ DIAGONAL SYNERGY HINTS ═══ -->
+        <path d="M 300 282 L 150 442" fill="none" stroke="rgba(200,255,0,0.04)" stroke-width="1" stroke-dasharray="3 8"/>
+        <path d="M 300 282 L 450 442" fill="none" stroke="rgba(200,255,0,0.04)" stroke-width="1" stroke-dasharray="3 8"/>
+
+        <!-- ═══ RETURN CURVES: leaf → Classroom Ecology (upward) ═══ -->
+        <path d="M 150 442 C 155 370 230 295 300 282" fill="none" stroke="rgba(200,255,0,0.06)" stroke-width="8" filter="url(#tubeGlow)"/>
+        <path d="M 450 442 C 445 370 370 295 300 282" fill="none" stroke="rgba(200,255,0,0.06)" stroke-width="8" filter="url(#tubeGlow)"/>
+        <path d="M 150 442 C 155 370 230 295 300 282" class="track-return"/>
+        <path d="M 450 442 C 445 370 370 295 300 282" class="track-return" style="animation-delay:-1.75s"/>
+        <!-- Neon highlight — uses dashNeonRet (period=14) via inline override -->
+        <path d="M 150 442 C 155 370 230 295 300 282" fill="none" stroke="rgba(200,255,0,0.55)" stroke-width="1" stroke-linecap="round" stroke-dasharray="2 12" filter="url(#neonGlow)" style="animation: dashNeonRet 4s linear infinite"/>
+        <path d="M 450 442 C 445 370 370 295 300 282" fill="none" stroke="rgba(200,255,0,0.55)" stroke-width="1" stroke-linecap="round" stroke-dasharray="2 12" filter="url(#neonGlow)" style="animation: dashNeonRet 4s linear infinite; animation-delay:-2s"/>
+
+        <!-- Return particles (upward, leaf → center) -->
+        <circle r="2"   fill="#c8ff00" filter="url(#neonGlow)" opacity="0.85">
+            <animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#mPath-ret-left"/></animateMotion>
+        </circle>
+        <circle r="1.5" fill="#ffffff" filter="url(#neonGlow)" opacity="0.5">
+            <animateMotion dur="3.2s" repeatCount="indefinite" begin="-1.6s"><mpath href="#mPath-ret-left"/></animateMotion>
+        </circle>
+        <circle r="2"   fill="#c8ff00" filter="url(#neonGlow)" opacity="0.85">
+            <animateMotion dur="3.2s" repeatCount="indefinite" begin="-0.4s"><mpath href="#mPath-ret-right"/></animateMotion>
+        </circle>
+        <circle r="1.5" fill="#ffffff" filter="url(#neonGlow)" opacity="0.5">
+            <animateMotion dur="3.2s" repeatCount="indefinite" begin="-2s"><mpath href="#mPath-ret-right"/></animateMotion>
+        </circle>
+
+        <!-- ═══ MAIN PATH INFRASTRUCTURE ═══ -->
+        <!-- Tube glow backdrops -->
+        <path d="M 300 138 L 300 282"           fill="none" stroke="rgba(200,255,0,0.07)" stroke-width="10" filter="url(#tubeGlow)"/>
+        <path d="M 300 212 L 150 212 L 150 442" fill="none" stroke="rgba(200,255,0,0.07)" stroke-width="10" filter="url(#tubeGlow)"/>
+        <path d="M 300 212 L 450 212 L 450 442" fill="none" stroke="rgba(200,255,0,0.07)" stroke-width="10" filter="url(#tubeGlow)"/>
+        <!-- Base tracks -->
+        <path d="M 300 138 L 300 282"           class="track-base"/>
+        <path d="M 300 212 L 150 212 L 150 442" class="track-base"/>
+        <path d="M 300 212 L 450 212 L 450 442" class="track-base"/>
+        <!-- Fast flow -->
+        <path d="M 300 138 L 300 282"           class="track-flow" filter="url(#neonGlow)"/>
+        <path d="M 300 212 L 150 212 L 150 442" class="track-flow" filter="url(#neonGlow)" style="animation-delay:-0.6s"/>
+        <path d="M 300 212 L 450 212 L 450 442" class="track-flow" filter="url(#neonGlow)" style="animation-delay:-1.3s"/>
+        <!-- Slow shimmer -->
+        <path d="M 300 138 L 300 282"           class="track-flow-slow" filter="url(#neonGlow)" style="animation-delay:-1s"/>
+        <path d="M 300 212 L 150 212 L 150 442" class="track-flow-slow" filter="url(#neonGlow)" style="animation-delay:-2.5s"/>
+        <path d="M 300 212 L 450 212 L 450 442" class="track-flow-slow" filter="url(#neonGlow)" style="animation-delay:-0.3s"/>
+
+        <!-- Downward particles -->
+        <circle r="2.5" fill="#c8ff00" filter="url(#neonGlow)" opacity="0.9">
+            <animateMotion dur="2.2s" repeatCount="indefinite"><mpath href="#mPath-trunk"/></animateMotion>
+        </circle>
+        <circle r="2"   fill="#ffffff" filter="url(#neonGlow)" opacity="0.6">
+            <animateMotion dur="2.2s" repeatCount="indefinite" begin="-0.75s"><mpath href="#mPath-trunk"/></animateMotion>
+        </circle>
+        <circle r="2.5" fill="#c8ff00" filter="url(#neonGlow)" opacity="0.9">
+            <animateMotion dur="3.4s" repeatCount="indefinite"><mpath href="#mPath-left"/></animateMotion>
+        </circle>
+        <circle r="2"   fill="#ffffff" filter="url(#neonGlow)" opacity="0.55">
+            <animateMotion dur="3.4s" repeatCount="indefinite" begin="-1.1s"><mpath href="#mPath-left"/></animateMotion>
+        </circle>
+        <circle r="1.5" fill="#c8ff00" filter="url(#neonGlow)" opacity="0.35">
+            <animateMotion dur="3.4s" repeatCount="indefinite" begin="-2.2s"><mpath href="#mPath-left"/></animateMotion>
+        </circle>
+        <circle r="2.5" fill="#c8ff00" filter="url(#neonGlow)" opacity="0.9">
+            <animateMotion dur="3.4s" repeatCount="indefinite" begin="-0.4s"><mpath href="#mPath-right"/></animateMotion>
+        </circle>
+        <circle r="2"   fill="#ffffff" filter="url(#neonGlow)" opacity="0.55">
+            <animateMotion dur="3.4s" repeatCount="indefinite" begin="-1.5s"><mpath href="#mPath-right"/></animateMotion>
+        </circle>
+        <circle r="1.5" fill="#c8ff00" filter="url(#neonGlow)" opacity="0.35">
+            <animateMotion dur="3.4s" repeatCount="indefinite" begin="-2.6s"><mpath href="#mPath-right"/></animateMotion>
+        </circle>
+
+        <!-- Branch junctions -->
+        <g filter="url(#neonGlow)">
+            <rect x="-5" y="-5" width="10" height="10" fill="rgba(200,255,0,0.55)" transform="translate(300,212) rotate(45)"/>
+            <rect x="-4" y="-4" width="8"  height="8"  fill="rgba(200,255,0,0.3)"  transform="translate(150,212) rotate(45)"/>
+            <rect x="-4" y="-4" width="8"  height="8"  fill="rgba(200,255,0,0.3)"  transform="translate(450,212) rotate(45)"/>
+        </g>
+
+        <!-- ══════════════════════════════════════
+             NODE 1 — RELATIONAL PREREQUISITE
+        ═══════════════════════════════════════ -->
+        <g>
+            <circle cx="300" cy="138" r="12" stroke="rgba(200,255,0,0.5)"  class="pulse-ring-a"/>
+            <circle cx="300" cy="138" r="12" stroke="rgba(200,255,0,0.28)" class="pulse-ring-b"/>
+            <circle cx="300" cy="138" r="30" fill="none" stroke="rgba(200,255,0,0.28)" stroke-width="1" stroke-dasharray="4 5">
+                <animateTransform attributeName="transform" type="rotate" from="0 300 138" to="360 300 138" dur="9s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="300" cy="138" r="20" fill="none" stroke="rgba(200,255,0,0.18)" stroke-width="1" stroke-dasharray="2 3">
+                <animateTransform attributeName="transform" type="rotate" from="0 300 138" to="-360 300 138" dur="5.5s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="300" cy="138" r="12" fill="rgba(0,20,0,0.92)" stroke="rgba(200,255,0,0.65)" stroke-width="1.5"/>
+            <line x1="285" y1="138" x2="281" y2="138" stroke="rgba(200,255,0,0.5)" stroke-width="1.2"/>
+            <line x1="315" y1="138" x2="319" y2="138" stroke="rgba(200,255,0,0.5)" stroke-width="1.2"/>
+            <line x1="300" y1="123" x2="300" y2="119" stroke="rgba(200,255,0,0.5)" stroke-width="1.2"/>
+            <line x1="300" y1="153" x2="300" y2="157" stroke="rgba(200,255,0,0.5)" stroke-width="1.2"/>
+            <circle cx="300" cy="138" r="5.5" fill="url(#nodeFill)" class="node-core-dot" filter="url(#neonGlow)"/>
+        </g>
+        <text x="300" y="76"  text-anchor="middle" class="lbl-title">RELĀTIŌ</text>
+        <text x="300" y="95"  text-anchor="middle" class="lbl-sub">from Latin, "a bringing back"</text>
+        <text x="300" y="112"  text-anchor="middle" class="lbl-sub">EMOTIONAL EQUILIBRIUM </text>
+        
+
+        <!-- ══════════════════════════════════════
+             NODE 2 — CLASSROOM ECOLOGY
+        ═══════════════════════════════════════ -->
+        <g>
+            <circle cx="300" cy="282" r="12" stroke="rgba(200,255,0,0.45)" class="pulse-ring-a" style="animation-delay:-0.9s"/>
+            <circle cx="300" cy="282" r="12" stroke="rgba(200,255,0,0.28)" class="pulse-ring-b" style="animation-delay:-2.3s"/>
+            <circle cx="300" cy="282" r="30" fill="none" stroke="rgba(200,255,0,0.24)" stroke-width="1" stroke-dasharray="4 5">
+                <animateTransform attributeName="transform" type="rotate" from="0 300 282" to="360 300 282" dur="13s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="300" cy="282" r="20" fill="none" stroke="rgba(200,255,0,0.15)" stroke-width="1" stroke-dasharray="2 3">
+                <animateTransform attributeName="transform" type="rotate" from="0 300 282" to="-360 300 282" dur="7s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="300" cy="282" r="12" fill="rgba(0,20,0,0.92)" stroke="rgba(200,255,0,0.55)" stroke-width="1.5"/>
+            <line x1="285" y1="282" x2="281" y2="282" stroke="rgba(200,255,0,0.45)" stroke-width="1.2"/>
+            <line x1="315" y1="282" x2="319" y2="282" stroke="rgba(200,255,0,0.45)" stroke-width="1.2"/>
+            <line x1="300" y1="267" x2="300" y2="263" stroke="rgba(200,255,0,0.45)" stroke-width="1.2"/>
+            <line x1="300" y1="297" x2="300" y2="301" stroke="rgba(200,255,0,0.45)" stroke-width="1.2"/>
+            <circle cx="300" cy="282" r="5.5" fill="url(#nodeFill)" class="node-core-dot" filter="url(#neonGlow)" style="animation-delay:-1.6s"/>
+        </g>
+        <text x="300" y="336" text-anchor="middle" class="lbl-title">CLASSROOM ECOLOGY</text>
+        <text x="300" y="356" text-anchor="middle" class="lbl-sub">CHOICE THEORY &amp; DIGNITY</text>
+
+        <!-- ══════════════════════════════════════
+             NODE 3 — CONSTRUCTIVISM
+        ═══════════════════════════════════════ -->
+        <g>
+            <circle cx="150" cy="442" r="12" stroke="rgba(200,255,0,0.4)"  class="pulse-ring-a" style="animation-delay:-0.5s"/>
+            <circle cx="150" cy="442" r="12" stroke="rgba(200,255,0,0.22)" class="pulse-ring-b" style="animation-delay:-1.9s"/>
+            <circle cx="150" cy="442" r="28" fill="none" stroke="rgba(200,255,0,0.22)" stroke-width="1" stroke-dasharray="3 5">
+                <animateTransform attributeName="transform" type="rotate" from="0 150 442" to="360 150 442" dur="11s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="150" cy="442" r="18" fill="none" stroke="rgba(200,255,0,0.13)" stroke-width="1" stroke-dasharray="2 3">
+                <animateTransform attributeName="transform" type="rotate" from="0 150 442" to="-360 150 442" dur="6s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="150" cy="442" r="12" fill="rgba(0,20,0,0.92)" stroke="rgba(200,255,0,0.5)" stroke-width="1.5"/>
+            <line x1="135" y1="442" x2="131" y2="442" stroke="rgba(200,255,0,0.42)" stroke-width="1.2"/>
+            <line x1="165" y1="442" x2="169" y2="442" stroke="rgba(200,255,0,0.42)" stroke-width="1.2"/>
+            <line x1="150" y1="427" x2="150" y2="423" stroke="rgba(200,255,0,0.42)" stroke-width="1.2"/>
+            <line x1="150" y1="457" x2="150" y2="461" stroke="rgba(200,255,0,0.42)" stroke-width="1.2"/>
+            <circle cx="150" cy="442" r="5.5" fill="url(#nodeFill)" class="node-core-dot" filter="url(#neonGlow)" style="animation-delay:-2.1s"/>
+        </g>
+        <text x="150" y="494" text-anchor="middle" class="lbl-title">CULTIVATING</text>
+        <text x="150" y="515" text-anchor="middle" class="lbl-title">AGENCY</text>
+        <text x="150" y="536" text-anchor="middle" class="lbl-sub">CONSTRUCTIVISM</text>
+
+        <!-- ══════════════════════════════════════
+             NODE 4 — LITERATURE AS SOULCRAFT
+        ═══════════════════════════════════════ -->
+        <g>
+            <circle cx="450" cy="442" r="12" stroke="rgba(200,255,0,0.4)"  class="pulse-ring-a" style="animation-delay:-1.2s"/>
+            <circle cx="450" cy="442" r="12" stroke="rgba(200,255,0,0.22)" class="pulse-ring-b" style="animation-delay:-2.8s"/>
+            <circle cx="450" cy="442" r="28" fill="none" stroke="rgba(200,255,0,0.22)" stroke-width="1" stroke-dasharray="3 5">
+                <animateTransform attributeName="transform" type="rotate" from="0 450 442" to="-360 450 442" dur="10s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="450" cy="442" r="18" fill="none" stroke="rgba(200,255,0,0.13)" stroke-width="1" stroke-dasharray="2 3">
+                <animateTransform attributeName="transform" type="rotate" from="0 450 442" to="360 450 442" dur="5.5s" repeatCount="indefinite"/>
+            </circle>
+            <circle cx="450" cy="442" r="12" fill="rgba(0,20,0,0.92)" stroke="rgba(200,255,0,0.5)" stroke-width="1.5"/>
+            <line x1="435" y1="442" x2="431" y2="442" stroke="rgba(200,255,0,0.42)" stroke-width="1.2"/>
+            <line x1="465" y1="442" x2="469" y2="442" stroke="rgba(200,255,0,0.42)" stroke-width="1.2"/>
+            <line x1="450" y1="427" x2="450" y2="423" stroke="rgba(200,255,0,0.42)" stroke-width="1.2"/>
+            <line x1="450" y1="457" x2="450" y2="461" stroke="rgba(200,255,0,0.42)" stroke-width="1.2"/>
+            <circle cx="450" cy="442" r="5.5" fill="url(#nodeFill)" class="node-core-dot" filter="url(#neonGlow)" style="animation-delay:-0.8s"/>
+        </g>
+        <text x="450" y="494" text-anchor="middle" class="lbl-title">CULTIVATING</text>
+        <text x="450" y="515" text-anchor="middle" class="lbl-title">EMPATHY</text>
+        <text x="450" y="536" text-anchor="middle" class="lbl-sub">HUMANISM</text>
+
+    </svg>
+
+    <!-- ── CAPTION ── -->
+    <div class="caption-box">
+        <p class="caption-text">
+            Trust flows downward — and returns. Agency and empathy are <strong class="hl-v2">feedback roots of solidarity</strong> that are called back into the ecology that made them possible, just as the Latin root of "relationship," <i>relatio</i>, means "a bringing back."
+        </p>
+    </div>
+
+</div>
+
+</body>
+</html>
